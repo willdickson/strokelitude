@@ -10,6 +10,8 @@ class StrokelitudeDataDescription(IsDescription):
     left_antenna = Float32Col(pos=5) # angle, degrees
     right_antenna = Float32Col(pos=6) # angle, degrees
     head = Float32Col(pos=7) # angle, degrees
+    pulse_width=Float32Col(pos=8) # random pulse width, 0 = short, 1 = long, 2 = unknown
+    pulse_frame=UInt64Col(pos=9) # frame number associated with random pulse
 
 AnalogInputWordstreamDescription = mdata_format.AnalogInputWordstreamDescription
 TimeDataDescription = mdata_format.TimeDataDescription

@@ -22,6 +22,7 @@ import scipy.ndimage
 import cairo
 import Queue
 import os, warnings, pickle
+import os.path
 import motmot.FlyMovieFormat.FlyMovieFormat as FMF
 
 import tables # pytables
@@ -52,6 +53,7 @@ BGReadyEvent = wx.NewEventType()
 
 D2R = np.pi/180.0
 R2D = 180.0/np.pi
+AOUT_MAX_VALUE = 500
 
 def load_plugins():
     # modified from motmot.fview.plugin_manager
@@ -768,6 +770,7 @@ class BackgroundSubtractionDotProductFinder(AmplitudeFinder):
         right_angle_degrees = np.nan
 
         have_lock = self.recomputing_lock.acquire(False) # don't block
+
         if not have_lock:
             return left_angle_degrees, right_angle_degrees
 
@@ -885,6 +888,7 @@ class BackgroundSubtractionDotProductFinder(AmplitudeFinder):
 
         finally:
             self.recomputing_lock.release()
+
         return left_angle_degrees, right_angle_degrees
 
     def _recompute_mask_fired(self):
@@ -1238,6 +1242,7 @@ class StrokelitudeClass(traited_plugin.HasTraits_FViewPlugin):
     latency_msec = traits.Float()
     save_to_disk = traits.Bool(False)
     streaming_filename = traits.File
+    last_filename = traits.File
     timestamp_modeler = traits.Instance(
         modeler_module.LiveTimestampModelerWithAnalogInput )
 
@@ -1291,93 +1296,95 @@ class StrokelitudeClass(traited_plugin.HasTraits_FViewPlugin):
                                     editable = True),
                                     style='custom'),
 
-                           Group(
-                               Group( Item('antennae_tracking_enabled'),
-                                      Item('follow_antennae_enabled'),
-                                      Item('draw_antennae_boxes'),
-                                      orientation = 'horizontal'),
-                           Group(
-                               Group(Item('pixel_threshold', width = 248),
-                                     Item('antenna_box_size', width = 248),
-                                     orientation = 'vertical',
-                                     show_border = True ),
+                          # Remove antennae tracking stuff - makes GUI easier to resize
+                          # -----------------------------------------------------------
+                          # Group(
+                          #     Group( Item('antennae_tracking_enabled'),
+                          #            Item('follow_antennae_enabled'),
+                          #            Item('draw_antennae_boxes'),
+                          #            orientation = 'horizontal'),
+                          # Group(
+                          #     Group(Item('pixel_threshold', width = 248),
+                          #           Item('antenna_box_size', width = 248),
+                          #           orientation = 'vertical',
+                          #           show_border = True ),
 
-                               Group(Item( 'head_pivot_point_x',
-                                            editor = RangeEditor( low_name    = 'zero',
-                                                                  high_name   = 'max_x',
-                                                                  mode        = 'slider' ),
-                                            label = 'X',
-                                            width = 350,
+                          #     Group(Item( 'head_pivot_point_x',
+                          #                  editor = RangeEditor( low_name    = 'zero',
+                          #                                        high_name   = 'max_x',
+                          #                                        mode        = 'slider' ),
+                          #                  label = 'X',
+                          #                  width = 350,
 
-                                     ),
-                                     Item( 'head_pivot_point_y',
-                                            editor = RangeEditor( low_name    = 'zero',
-                                                                  high_name   = 'max_y',
-                                                                  mode        = 'slider' ),
-                                            label = 'Y',
-                                            width = 350,
+                          #           ),
+                          #           Item( 'head_pivot_point_y',
+                          #                  editor = RangeEditor( low_name    = 'zero',
+                          #                                        high_name   = 'max_y',
+                          #                                        mode        = 'slider' ),
+                          #                  label = 'Y',
+                          #                  width = 350,
 
-                                     ),
-                                     orientation = 'vertical',
-                                     label = 'Head pivot point coordinates',
-                                     show_border = True ),
-                               orientation = 'horizontal'),
+                          #           ),
+                          #           orientation = 'vertical',
+                          #           label = 'Head pivot point coordinates',
+                          #           show_border = True ),
+                          #     orientation = 'horizontal'),
+
+                          #     Group(
+                          #     Group(Item( 'A_antenna_x',
+                          #                  editor = RangeEditor( low_name    = 'dynamic_min_x',
+                          #                                        high_name   = 'dynamic_max_x',
+                          #                                        mode        = 'slider' ),
+                          #                  label = 'X',
+                          #                  width = 350,
+
+                          #           ),
+                          #           Item( 'A_antenna_y',
+                          #                  editor = RangeEditor( low_name    = 'dynamic_min_y',
+                          #                                        high_name   = 'dynamic_max_y',
+                          #                                        mode        = 'slider' ),
+                          #                  label = 'Y',
+                          #                  width = 350,
+
+                          #           ),
+                          #           orientation = 'vertical',
+                          #           label = 'Box A coordinates',
+                          #           show_border = True,
+                          #           padding = True ),
+
+                          #     Group(Item( 'B_antenna_x',
+                          #                  editor = RangeEditor( low_name    = 'dynamic_min_x',
+                          #                                        high_name   = 'dynamic_max_x',
+                          #                                        mode        = 'slider' ),
+                          #                  label = 'X',
+                          #                  width = 350,
+
+                          #           ),
+                          #           Item( 'B_antenna_y',
+                          #                  editor = RangeEditor( low_name    = 'dynamic_min_y',
+                          #                                        high_name   = 'dynamic_max_y',
+                          #                                        mode        = 'slider' ),
+                          #                  label = 'Y',
+                          #                  width = 350,
+
+                          #           ),
+                          #           orientation = 'vertical',
+                          #           label = 'Box B coordinates',
+                          #           show_border = True ),
+                          #     orientation = 'horizontal'),
+
+                          #     label = 'Antennae tracking',
+                          #     show_border = True ),
 
                                Group(
-                               Group(Item( 'A_antenna_x',
-                                            editor = RangeEditor( low_name    = 'dynamic_min_x',
-                                                                  high_name   = 'dynamic_max_x',
-                                                                  mode        = 'slider' ),
-                                            label = 'X',
-                                            width = 350,
-
-                                     ),
-                                     Item( 'A_antenna_y',
-                                            editor = RangeEditor( low_name    = 'dynamic_min_y',
-                                                                  high_name   = 'dynamic_max_y',
-                                                                  mode        = 'slider' ),
-                                            label = 'Y',
-                                            width = 350,
-
-                                     ),
-                                     orientation = 'vertical',
-                                     label = 'Box A coordinates',
-                                     show_border = True,
-                                     padding = True ),
-
-                               Group(Item( 'B_antenna_x',
-                                            editor = RangeEditor( low_name    = 'dynamic_min_x',
-                                                                  high_name   = 'dynamic_max_x',
-                                                                  mode        = 'slider' ),
-                                            label = 'X',
-                                            width = 350,
-
-                                     ),
-                                     Item( 'B_antenna_y',
-                                            editor = RangeEditor( low_name    = 'dynamic_min_y',
-                                                                  high_name   = 'dynamic_max_y',
-                                                                  mode        = 'slider' ),
-                                            label = 'Y',
-                                            width = 350,
-
-                                     ),
-                                     orientation = 'vertical',
-                                     label = 'Box B coordinates',
-                                     show_border = True ),
-                               orientation = 'horizontal'),
-
-                               label = 'Antennae tracking',
-                               show_border = True ),
-
-                               Group(
-                               Item('current_stimulus_plugin',
-                                    show_label=False,
-                                    editor=InstanceEditor(
-                                    name = 'avail_stim_plugins',
-                                    selectable=True,
-                                    editable = False),
-                                    style='custom'),
-                               Item('edit_stimulus',show_label=False),
+                               #Item('current_stimulus_plugin',
+                               #     show_label=False,
+                               #     editor=InstanceEditor(
+                               #     name = 'avail_stim_plugins',
+                               #     selectable=True,
+                               #     editable = False),
+                               #     style='custom'),
+                               #Item('edit_stimulus',show_label=False),
                                orientation='horizontal'),
 
                                Item('draw_mask'),
@@ -1385,8 +1392,10 @@ class StrokelitudeClass(traited_plugin.HasTraits_FViewPlugin):
                                Item('maskdata',show_label=False),
 
                                Item(name='save_to_disk'),
-                               Item('write_data_to_a_text_file'),
+                               #Item('write_data_to_a_text_file'),
                                Item(name='streaming_filename',
+                                    style='readonly'),
+                               Item(name='last_filename',
                                     style='readonly'),
                                ))
 
@@ -1551,9 +1560,47 @@ class StrokelitudeClass(traited_plugin.HasTraits_FViewPlugin):
     def _save_to_disk_changed(self):
         self.service_save_data()
         if self.save_to_disk:
+
+            # Clear data queue, and start pulse streaming
+            self.save_data_queue = Queue.Queue()
+            self.timestamp_modeler.rand_pulse_enable()
             self.timestamp_modeler.block_activity = True
 
-            self.streaming_filename = time.strftime('strokelitude%Y%m%d_%H%M%S.h5')
+            #
+            # WBD - save to $USER/strokelitude_data directory  
+            # -----------------------------------------------------------------
+            # look for $USER/strokelitude_data directory create if doesn't exist
+            data_dir = os.path.join(os.environ['HOME'],'strokelitude_h5')
+            if not os.path.exists(data_dir):
+                os.mkdir(data_dir)
+
+            # Search in $USER/strokelitude_data, for files with the same date and count # 
+            today_date_str = time.strftime('%Y_%m_%d')
+            data_file_list = os.listdir(data_dir)
+            fcnt_list = []
+            for f in data_file_list:
+                fname, fext = os.path.splitext(f)
+                fdate_str = fname[0:10]
+                fcnt_str = fname[12:]
+                if fdate_str == today_date_str:
+                    try:
+                        fcnt_list.append(int(fcnt_str))
+                    except:
+                        print 'Error: adding file counter for file %s'%(f,)
+                
+            if not fcnt_list:
+                fcnt = 1
+            else:
+                fcnt = max(fcnt_list) + 1
+            if fcnt < 100:
+                fmt_str = '%%s_f%%0%dd.h5'%(2,)
+            else:
+                num_digits = math.floor(math.log10(fcnt))
+                fmt_str = '%%s_f%%0%dd.h5'%(num_digits,)
+            data_filename = '%s_f%02d.h5'%(today_date_str,fcnt)
+            self.streaming_filename = os.path.join(data_dir,data_filename)
+            # -----------------------------------------------------------------
+
             self.streaming_file = tables.openFile( self.streaming_filename, mode='w')
             self.stream_ain_table   = self.streaming_file.createTable(
                 self.streaming_file.root,'ain_wordstream',AnalogInputWordstreamDescription,
@@ -1597,8 +1644,10 @@ class StrokelitudeClass(traited_plugin.HasTraits_FViewPlugin):
             self.streaming_file.close()
             self.streaming_file = None
             print 'closed',repr(self.streaming_filename)
+            self.last_filename = self.streaming_filename
             self.streaming_filename = ''
             self.timestamp_modeler.block_activity = False
+            self.timestamp_modeler.rand_pulse_disable()
 
     def _edit_stimulus_fired(self):
         if self.current_stimulus_plugin is not None:
@@ -1665,6 +1714,34 @@ class StrokelitudeClass(traited_plugin.HasTraits_FViewPlugin):
 
         tmp = self.current_amplitude_method.process_frame(buf,buf_offset,timestamp,framenumber)
         left_angle_degrees, right_angle_degrees = tmp
+
+        # WBD - random pulse 2nd attempt
+        # ----------------------------------------------------------------------
+        if self.timestamp_modeler.rand_pulse_flag == True:
+            frame_offset = self.timestamp_modeler.get_frame_offset(cam_id)
+            pulse_framenumber, pulse_width = self.timestamp_modeler.rand_pulse_data
+            pulse_framenumber = pulse_framenumber + frame_offset
+            self.timestamp_modeler.rand_pulse_flag = False
+            #print framenumber, pulse_framenumber
+        else:
+            pulse_framenumber, pulse_width = -1,-1
+
+        # WBD - get pulse width associated with current frame
+        # ----------------------------------------------------------------------
+        #frame_offset = self.timestamp_modeler.get_frame_offset(cam_id)
+        #if framenumber%50 == 0:
+        #    pulse_width = self.timestamp_modeler.get_width_from_framecnt(framenumber-frame_offset)
+        #else:
+        #    pulse_width = -1
+        #pulse_width = float(pulse_width)
+        ##print 'frame #:', framenumber, 'pulse width:', pulse_width
+        #pulse_width = 0
+        # ----------------------------------------------------------------------
+        
+        # WBD - Set analog values based on wing angles
+        # ---------------------------------------------------------------------
+        #self.set_aout_values(left_angle_degrees,right_angle_degrees)
+        # ---------------------------------------------------------------------
 
         # draw lines
         for side, angle_degrees in [('left',left_angle_degrees),
@@ -1872,6 +1949,7 @@ class StrokelitudeClass(traited_plugin.HasTraits_FViewPlugin):
                     experiment_time = time.strftime("%H%M%S")
                     experiment_date = time.strftime("%Y%m%d")
                     antennae_filename = 'angles_' + experiment_date + '_' + experiment_time + '.txt'
+                    print antennae_filename
                     self.antennae_angle = open(antennae_filename,'w')
                     self.first_run = 0
                 timestamp = repr(time.time()) + '\t'
@@ -1881,10 +1959,13 @@ class StrokelitudeClass(traited_plugin.HasTraits_FViewPlugin):
                 line = timestamp + antennae_line + wing_line + head_line
                 self.antennae_angle.write(line)
 
-            self.save_data_queue.put(
-                (framenumber,trigger_timestamp,processing_timestamp,
-                left_angle_degrees, right_angle_degrees,
-                left_theta_degrees, right_theta_degrees, head_theta_degrees))
+            # WBD - move to below if antennae/head tracking 
+            # -----------------------------------------------------------------
+            #self.save_data_queue.put(
+            #    (framenumber,trigger_timestamp,processing_timestamp,
+            #    left_angle_degrees, right_angle_degrees,
+            #    left_theta_degrees, right_theta_degrees, head_theta_degrees,
+            #    pulse_width))
 
             if 1:
                 # Draw a lines along the antennae
@@ -1937,6 +2018,22 @@ class StrokelitudeClass(traited_plugin.HasTraits_FViewPlugin):
                 draw_linesegs.append( letter_L1 )
                 draw_linesegs.append( letter_L2 )
 
+        else:
+            # WBD - dummy values for when antenna and head tracking are not enabled
+            # ---------------------------------------------------------------------
+            left_theta_degrees = 0
+            right_theta_degrees = 0
+            head_theta_degrees = 0
+
+
+        # WBD - put data into data queue
+        # ---------------------------------------------------------------------
+        self.save_data_queue.put(
+            (framenumber,trigger_timestamp,processing_timestamp,
+            left_angle_degrees, right_angle_degrees,
+            left_theta_degrees, right_theta_degrees, head_theta_degrees,
+            pulse_width, pulse_framenumber))
+
         return draw_points, draw_linesegs
 
     def camera_starting_notification(self,cam_id,
@@ -1986,6 +2083,33 @@ class StrokelitudeClass(traited_plugin.HasTraits_FViewPlugin):
 
         if self.current_stimulus_plugin is not None:
             self.current_stimulus_plugin.shutdown()
+
+#
+# WBD - sets analog output values based on wing angles
+# ------------------------------------------------------------------------
+    def set_aout_values(self,left_angle_degrees, right_angle_degrees):
+        """
+        Sets analog out values for left and right wings
+        """
+        val0 = wing_angle_2_aout(left_angle_degrees)
+        val1 = wing_angle_2_aout(right_angle_degrees)
+        try:
+            self.timestamp_modeler.set_aout_values(val0,val1)
+        except:
+            print 'Warning: error setting aout'
+
+def wing_angle_2_aout(angle_degrees):
+    """
+    Computes analog output value based on wing angle
+    """
+    if not np.isnan(angle_degrees):
+        aout = 100*((angle_degrees  - (-45.0))*(5.0/135.0))
+        aout = max([0,aout])
+        aout = min([AOUT_MAX_VALUE,aout])
+    else:
+        aout = 0.0
+    return int(aout)
+# ----------------------------------------------------------------------------
 
 if __name__=='__main__':
     data = MaskData()

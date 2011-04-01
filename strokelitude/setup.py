@@ -6,6 +6,7 @@ setup(name='strokelitude',
       entry_points = {
     'motmot.fview.plugins':
     'strokelitude = strokelitude.strokelitude:StrokelitudeClass',
+    'console_scripts' : ['hfive2mat=hfive2mat:main']
     },
 
       packages = find_packages(),
